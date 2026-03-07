@@ -13,6 +13,7 @@ export default function SettingsPage() {
     const [endDa, setEndDa] = useState('');
     const [countSundays, setCountSundays] = useState(true);
     const [settings, setSettings] = useState<any[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         fetch(`${API_BASE}/api/settings/`)
@@ -25,6 +26,7 @@ export default function SettingsPage() {
         e.preventDefault();
         if (!startDa || !endDa) return;
 
+        setIsSaving(true);
         try {
             const res = await fetch(`${API_BASE}/api/settings/`, {
                 method: 'POST',
@@ -41,6 +43,8 @@ export default function SettingsPage() {
             alert("Settings Saved!");
         } catch (err) {
             console.error(err);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -70,6 +74,7 @@ export default function SettingsPage() {
                                 className="input-field"
                                 value={startDa}
                                 onChange={e => setStartDa(e.target.value)}
+                                disabled={isSaving}
                             />
                         </div>
                         <div className="space-y-2">
@@ -79,6 +84,7 @@ export default function SettingsPage() {
                                 className="input-field"
                                 value={endDa}
                                 onChange={e => setEndDa(e.target.value)}
+                                disabled={isSaving}
                             />
                         </div>
                     </div>
@@ -90,6 +96,7 @@ export default function SettingsPage() {
                             className="w-5 h-5 text-primary rounded border-border focus:ring-primary"
                             checked={countSundays}
                             onChange={(e) => setCountSundays(e.target.checked)}
+                            disabled={isSaving}
                         />
                         <label htmlFor="countSundays" className="font-medium cursor-pointer">
                             Count Sundays in Schedule
@@ -97,9 +104,18 @@ export default function SettingsPage() {
                         </label>
                     </div>
 
-                    <button type="submit" className="btn-primary w-full h-12 gap-2 transition-all">
-                        <Save size={18} />
-                        Save Configuration
+                    <button type="submit" disabled={isSaving} className="btn-primary w-full h-12 gap-2 transition-all">
+                        {isSaving ? (
+                            <span className="flex items-center gap-2">
+                                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                                Saving...
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-2">
+                                <Save size={18} />
+                                Save Configuration
+                            </span>
+                        )}
                     </button>
                 </form>
             </motion.div>

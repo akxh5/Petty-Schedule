@@ -266,6 +266,17 @@ def export_pdf(db: Session = Depends(database.get_db)):
         headers={"Content-Disposition": "attachment; filename=roster.pdf"}
     )
 
+# --- Reset ---
+@router.delete("/reset")
+def reset_scheduler(db: Session = Depends(database.get_db)):
+    db.query(models.RosterAssignment).delete()
+    db.query(models.Constraint).delete()
+    db.query(models.Location).delete()
+    db.query(models.Professor).delete()
+    db.query(models.DutySetting).delete()
+    db.commit()
+    return {"message": "Scheduler reset successfully"}
+
 app.include_router(router, prefix="/api")
 
 @app.get("/")

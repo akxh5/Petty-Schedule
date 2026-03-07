@@ -49,6 +49,7 @@ export default function LocationsPage() {
         const newLoc = { id: Math.random().toString(), name };
         setLocations([...locations, newLoc]);
         setName('');
+        setLoading(true);
 
         try {
             await fetch(`${API_BASE}/api/locations/`, {
@@ -58,6 +59,8 @@ export default function LocationsPage() {
             });
         } catch (err) {
             console.error("API Error", err);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -95,11 +98,21 @@ export default function LocationsPage() {
                             className="input-field"
                             value={name}
                             onChange={e => setName(e.target.value)}
+                            disabled={loading}
                         />
                     </div>
-                    <button type="submit" className="btn-primary flex-shrink-0 h-10 md:h-12 px-6 gap-2 w-full md:w-auto">
-                        <MapPinPlus size={18} />
-                        <span>Add Location</span>
+                    <button type="submit" disabled={loading} className="btn-primary flex-shrink-0 h-10 md:h-12 px-6 gap-2 w-full md:w-auto overflow-hidden group">
+                        {loading ? (
+                            <span className="flex items-center gap-2">
+                                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                                Saving...
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-2">
+                                <MapPinPlus size={18} />
+                                <span>Add Location</span>
+                            </span>
+                        )}
                     </button>
                 </form>
             </motion.div>

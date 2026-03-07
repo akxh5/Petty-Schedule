@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarRange, Sparkles, RefreshCcw, Printer, ArrowRight, Download, AlertTriangle } from 'lucide-react';
+import { CalendarRange, Sparkles, RefreshCcw, Printer, ArrowRight, Download, AlertTriangle, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useRouter } from 'next/navigation';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -16,6 +17,9 @@ export default function RosterPage() {
     const [professors, setProfessors] = useState<any[]>([]);
     const [locations, setLocations] = useState<any[]>([]);
     const [diagnostics, setDiagnostics] = useState<any>(null);
+    const [resetLoading, setResetLoading] = useState(false);
+    const [showResetModal, setShowResetModal] = useState(false);
+    const router = useRouter();
 
     useEffect(() => {
         fetchData();
@@ -99,6 +103,24 @@ export default function RosterPage() {
         window.open(`${API_BASE}/api/export/${formatStr}`, '_blank');
     };
 
+    const handleReset = async () => {
+        setResetLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/reset`, { method: 'DELETE' });
+            if (!res.ok) throw new Error("Failed to reset scheduler");
+            setSuccess("Scheduler cleared successfully");
+            setShowResetModal(false);
+            setTimeout(() => {
+                router.push('/professors');
+            }, 1000);
+        } catch (err: any) {
+            setErrorMsg(err.message);
+            setShowResetModal(false);
+        } finally {
+            setResetLoading(false);
+        }
+    };
+
     let currentWeekDisplay: number | null = null;
 
     return (
@@ -110,6 +132,13 @@ export default function RosterPage() {
                 </motion.div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
+                    <button
+                        onClick={() => setShowResetModal(true)}
+                        className="btn-secondary text-destructive hover:bg-destructive/10 border-destructive/20 gap-2 flex-1 sm:flex-none h-12"
+                    >
+                        <Trash2 size={18} />
+                        <span>Reset Scheduler</span>
+                    </button>
                     {assignments.length > 0 && (
                         <div className="flex gap-3 w-full sm:w-auto">
                             <button onClick={() => handleDownload('csv')} className="btn-secondary gap-2 flex-1 sm:flex-none h-12">
@@ -131,7 +160,7 @@ export default function RosterPage() {
                     >
                         <span className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
                         {loading ? <RefreshCcw className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                        <span>{loading ? 'Solving CSP...' : 'Generate New Roster'}</span>
+                        <span>{loading ? 'Generating roster...' : 'Generate New Roster'}</span>
                     </button>
                 </div>
             </div>
@@ -289,6 +318,27 @@ export default function RosterPage() {
                         </div>
                     </motion.div>
                 </motion.div>
+            )}
+
+            {showResetModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-card p-6 rounded-2xl shadow-xl max-w-sm w-full border border-border">
+                        <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-foreground">
+                            <AlertTriangle className="text-destructive" size={20} />
+                            Reset Scheduler?
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-6">
+                            This will delete all professors, locations, constraints and roster data. System will return to a fresh state.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button disabled={resetLoading} onClick={() => setShowResetModal(false)} className="btn-secondary h-9 px-4 text-sm">Cancel</button>
+                            <button disabled={resetLoading} onClick={handleReset} className="h-9 px-4 text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg font-medium transition-colors flex items-center gap-2">
+                                {resetLoading ? <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span> : null}
+                                {resetLoading ? 'Resetting...' : 'Reset Scheduler'}
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
             )}
         </div>
     );
