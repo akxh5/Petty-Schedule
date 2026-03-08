@@ -16,9 +16,11 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        fetch(`${API_BASE}/api/settings/`)
+        fetch(`${API_BASE}/api/settings`)
             .then(r => r.json())
-            .then(d => setSettings(d))
+            .then(d => {
+                if (Array.isArray(d)) setSettings(d);
+            })
             .catch(e => console.error(e));
     }, []);
 
@@ -28,7 +30,7 @@ export default function SettingsPage() {
 
         setIsSaving(true);
         try {
-            const res = await fetch(`${API_BASE}/api/settings/`, {
+            const res = await fetch(`${API_BASE}/api/settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -39,8 +41,12 @@ export default function SettingsPage() {
                 })
             });
             const data = await res.json();
-            setSettings([...settings, data]);
-            alert("Settings Saved!");
+            if (res.ok) {
+                setSettings([...settings, data]);
+                alert("Settings Saved!");
+            } else {
+                alert("Failed to save settings: " + (data.detail || "Unknown error"));
+            }
         } catch (err) {
             console.error(err);
         } finally {

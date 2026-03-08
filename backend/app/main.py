@@ -36,7 +36,7 @@ app.add_middleware(
 def health_check():
     return {"status": "ok"}
 
-router = APIRouter(redirect_slashes=False)
+router = APIRouter()
 
 # --- Professors ---
 @router.post("/professors", response_model=schemas.Professor)

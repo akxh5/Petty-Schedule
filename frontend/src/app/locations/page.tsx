@@ -52,7 +52,7 @@ export default function LocationsPage() {
         setLoading(true);
 
         try {
-            await fetch(`${API_BASE}/api/locations/`, {
+            await fetch(`${API_BASE}/api/locations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
@@ -65,7 +65,7 @@ export default function LocationsPage() {
     };
 
     useEffect(() => {
-        fetch(`${API_BASE}/api/locations/`)
+        fetch(`${API_BASE}/api/locations`)
             .then(r => r.json())
             .then(data => {
                 if (Array.isArray(data)) setLocations(data);

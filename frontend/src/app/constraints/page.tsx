@@ -42,9 +42,9 @@ export default function ConstraintsPage() {
 
     useEffect(() => {
         Promise.all([
-            fetch(`${API_BASE}/api/professors/`).then(r => r.json()),
-            fetch(`${API_BASE}/api/locations/`).then(r => r.json()),
-            fetch(`${API_BASE}/api/constraints/`).then(r => r.json())
+            fetch(`${API_BASE}/api/professors`).then(r => r.json()),
+            fetch(`${API_BASE}/api/locations`).then(r => r.json()),
+            fetch(`${API_BASE}/api/constraints`).then(r => r.json())
         ]).then(([p, l, c]) => {
             if (Array.isArray(p)) setProfessors(p);
             if (Array.isArray(l)) setLocations(l);
@@ -78,7 +78,7 @@ export default function ConstraintsPage() {
         };
 
         try {
-            const res = await fetch(`${API_BASE}/api/constraints/`, {
+            const res = await fetch(`${API_BASE}/api/constraints`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newConstraint)

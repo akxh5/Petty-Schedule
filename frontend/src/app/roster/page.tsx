@@ -28,20 +28,20 @@ export default function RosterPage() {
     const fetchData = async () => {
         try {
             const [rAsg, rSett, rProf, rLoc] = await Promise.all([
-                fetch(`${API_BASE}/api/roster/`),
-                fetch(`${API_BASE}/api/settings/`),
-                fetch(`${API_BASE}/api/professors/`),
-                fetch(`${API_BASE}/api/locations/`)
+                fetch(`${API_BASE}/api/roster`),
+                fetch(`${API_BASE}/api/settings`),
+                fetch(`${API_BASE}/api/professors`),
+                fetch(`${API_BASE}/api/locations`)
             ]);
             const asgData = await rAsg.json();
             const settData = await rSett.json();
 
-            setAssignments(asgData);
-            setSettings(settData);
+            setAssignments(Array.isArray(asgData) ? asgData : []);
+            setSettings(Array.isArray(settData) ? settData : []);
             setProfessors(await rProf.json());
             setLocations(await rLoc.json());
 
-            if (settData.length > 0) {
+            if (Array.isArray(settData) && settData.length > 0) {
                 const latestSettingId = settData[settData.length - 1].id;
                 const diagRes = await fetch(`${API_BASE}/api/roster/diagnostics?setting_id=${latestSettingId}`);
                 if (diagRes.ok) {
@@ -60,7 +60,7 @@ export default function RosterPage() {
         setLoading(true);
         setErrorMsg('');
         try {
-            const res = await fetch(`${API_BASE}/api/generate-roster/?setting_id=${latestSettingId}`, {
+            const res = await fetch(`${API_BASE}/api/generate-roster?setting_id=${latestSettingId}`, {
                 method: 'POST'
             });
             const data = await res.json();

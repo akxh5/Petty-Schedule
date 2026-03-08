@@ -58,7 +58,7 @@ export default function ProfessorsPage() {
         setCode('');
 
         try {
-            await fetch(`${API_BASE}/api/professors/`, {
+            await fetch(`${API_BASE}/api/professors`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, code })
@@ -71,7 +71,7 @@ export default function ProfessorsPage() {
     };
 
     useEffect(() => {
-        fetch(`${API_BASE}/api/professors/`)
+        fetch(`${API_BASE}/api/professors`)
             .then(r => r.json())
             .then(data => {
                 if (Array.isArray(data)) setProfessors(data);
