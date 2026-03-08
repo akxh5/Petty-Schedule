@@ -14,7 +14,6 @@ class LocationBase(BaseModel):
 class DutySettingBase(BaseModel):
     start_date: date
     end_date: date
-    locations_per_day: int
     count_sundays: bool = True
 
 class ConstraintBase(BaseModel):

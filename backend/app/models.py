@@ -42,7 +42,6 @@ class DutySetting(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    locations_per_day = Column(Integer, default=3)
     count_sundays = Column(Integer, default=1) # Boolean equivalent for sqlite/postgres compatibility
     created_at = Column(Date, default=datetime.date.today)
 

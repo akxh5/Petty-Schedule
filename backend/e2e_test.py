@@ -61,7 +61,6 @@ def run_e2e_test():
     res = client.post("/api/settings", json={
         "start_date": str(start_date),
         "end_date": str(end_date),
-        "locations_per_day": 5,
         "count_sundays": True
     })
     assert res.status_code == 200

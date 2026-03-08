@@ -39,7 +39,7 @@ def seed_and_test():
     db.commit()
     
     # 3. Add Settings (Feb 1 2026 to Feb 28 2026) -> 28 days -> 84 slots
-    s = models.DutySetting(start_date=date(2026, 2, 1), end_date=date(2026, 2, 28), locations_per_day=3)
+    s = models.DutySetting(start_date=date(2026, 2, 1), end_date=date(2026, 2, 28))
     db.add(s)
     db.commit()
     

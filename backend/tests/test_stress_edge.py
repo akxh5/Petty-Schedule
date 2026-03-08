@@ -51,7 +51,6 @@ def test_stress_simulation():
     setting = client.post("/api/settings", json={
         "start_date": str(start_date),
         "end_date": str(end_date),
-        "locations_per_day": 6,
         "count_sundays": True
     }).json()
     
@@ -117,7 +116,6 @@ def test_impossible_constraints():
     setting = client.post("/api/settings", json={
         "start_date": str(start_date),
         "end_date": str(start_date),
-        "locations_per_day": 1,
         "count_sundays": True
     }).json()
     
@@ -135,7 +133,6 @@ def test_too_few_professors():
     setting = client.post("/api/settings", json={
         "start_date": "2026-03-01",
         "end_date": "2026-03-01",
-        "locations_per_day": 5,
         "count_sundays": True
     }).json()
     
@@ -151,7 +148,6 @@ def test_delete_professor_after_generation():
     setting = client.post("/api/settings", json={
         "start_date": "2026-03-01",
         "end_date": "2026-03-02",
-        "locations_per_day": 1,
         "count_sundays": True
     }).json()
     

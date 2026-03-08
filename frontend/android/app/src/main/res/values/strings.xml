@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Faculty Duty Scheduler</string>
+    <string name="title_activity_main">Faculty Duty Scheduler</string>
+    <string name="package_name">com.akshansh.scheduler</string>
+    <string name="custom_url_scheme">com.akshansh.scheduler</string>
+</resources>

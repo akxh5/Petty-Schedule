@@ -36,7 +36,6 @@ export default function SettingsPage() {
                 body: JSON.stringify({
                     start_date: startDa,
                     end_date: endDa,
-                    locations_per_day: 3, // Defaults to total locations
                     count_sundays: countSundays
                 })
             });

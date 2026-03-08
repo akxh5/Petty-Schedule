@@ -53,7 +53,6 @@ def test_full_scheduling_cycle():
     setting_payload = {
         "start_date": str(start_date),
         "end_date": str(end_date),
-        "locations_per_day": 3,
         "count_sundays": True
     }
     response = client.post("/api/settings", json=setting_payload)
@@ -144,7 +143,6 @@ def test_sunday_constraint():
     setting = client.post("/api/settings", json={
         "start_date": str(start_date),
         "end_date": str(end_date),
-        "locations_per_day": 1,
         "count_sundays": False
     }).json()
     
@@ -162,7 +160,6 @@ def test_export_endpoints():
     setting = client.post("/api/settings", json={
         "start_date": "2026-03-01",
         "end_date": "2026-03-05",
-        "locations_per_day": 1,
         "count_sundays": True
     }).json()
     client.post(f"/api/generate-roster?setting_id={setting['id']}")
