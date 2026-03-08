@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import List, Optional, Any, Dict
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from .models import ConstraintType
 
 # Base Schemas
@@ -43,28 +43,34 @@ class ConstraintCreate(ConstraintBase):
 class Professor(ProfessorBase):
     id: UUID
     created_at: date
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
 
 class Location(LocationBase):
     id: UUID
     created_at: date
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
 
 class DutySetting(DutySettingBase):
     id: UUID
     created_at: datetime
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
 
 class Constraint(ConstraintBase):
     id: UUID
     professor_id: UUID
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
 
 class RosterAssignment(RosterAssignmentBase):
     id: UUID
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
 
 class ProfessorWithDetails(Professor):
     constraints: List[Constraint] = []
     assignments: List[RosterAssignment] = []
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True

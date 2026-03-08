@@ -5,7 +5,7 @@ from uuid import UUID
 from ortools.sat.python import cp_model
 from sqlalchemy.orm import Session
 
-from app import models
+from ... import models
 
 class SchedulingError(Exception):
     pass

@@ -1,6 +1,7 @@
 import os
 import io
 import csv
+from uuid import UUID
 from typing import List
 from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.responses import StreamingResponse
@@ -52,7 +53,7 @@ def read_professors(skip: int = 0, limit: int = 100, db: Session = Depends(datab
     return db.query(models.Professor).offset(skip).limit(limit).all()
 
 @router.delete("/professors/{professor_id}")
-def delete_professor(professor_id: str, db: Session = Depends(database.get_db)):
+def delete_professor(professor_id: UUID, db: Session = Depends(database.get_db)):
     db_prof = db.query(models.Professor).filter(models.Professor.id == professor_id).first()
     if not db_prof:
         raise HTTPException(status_code=404, detail="Professor not found")
@@ -74,7 +75,7 @@ def read_locations(db: Session = Depends(database.get_db)):
     return db.query(models.Location).all()
 
 @router.delete("/locations/{location_id}")
-def delete_location(location_id: str, db: Session = Depends(database.get_db)):
+def delete_location(location_id: UUID, db: Session = Depends(database.get_db)):
     db_loc = db.query(models.Location).filter(models.Location.id == location_id).first()
     if not db_loc:
         raise HTTPException(status_code=404, detail="Location not found")
@@ -108,7 +109,7 @@ def read_constraints(db: Session = Depends(database.get_db)):
     return db.query(models.Constraint).all()
 
 @router.delete("/constraints/{constraint_id}")
-def delete_constraint(constraint_id: str, db: Session = Depends(database.get_db)):
+def delete_constraint(constraint_id: UUID, db: Session = Depends(database.get_db)):
     db_constraint = db.query(models.Constraint).filter(models.Constraint.id == constraint_id).first()
     if not db_constraint:
         raise HTTPException(status_code=404, detail="Constraint not found")
@@ -140,14 +141,14 @@ def get_roster(db: Session = Depends(database.get_db)):
     return db.query(models.RosterAssignment).order_by(models.RosterAssignment.date.asc()).all()
 
 @router.get("/roster/diagnostics")
-def get_diagnostics(setting_id: str, db: Session = Depends(database.get_db)):
+def get_diagnostics(setting_id: UUID, db: Session = Depends(database.get_db)):
     try:
         return solver.check_feasibility(db, setting_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate-roster")
-def build_roster(setting_id: str, db: Session = Depends(database.get_db)):
+def build_roster(setting_id: UUID, db: Session = Depends(database.get_db)):
     try:
         result = solver.generate_schedule(db, setting_id)
         return result

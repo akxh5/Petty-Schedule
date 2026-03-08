@@ -88,6 +88,8 @@ def test_full_scheduling_cycle():
 
     # Step 3 — Generate Schedule
     response = client.post(f"/api/generate-roster?setting_id={setting['id']}")
+    if response.status_code != 200:
+        print(response.json())
     assert response.status_code == 200
 
     # Retrieve roster

@@ -1,0 +1,395 @@
+import os
+import io
+import csv
+from uuid import UUID
+from typing import List
+from fastapi import FastAPI, Depends, HTTPException, APIRouter
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib import colors
+
+from . import models, schemas, database
+from .services.scheduler import solver
+
+# Ensure DB tables are created
+models.Base.metadata.create_all(bind=database.engine)
+
+app = FastAPI(title="Faculty Duty Scheduler API")
+
+# Add Request Logging Middleware
+from fastapi import Request
+import time
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    path = request.url.path
+    method = request.method
+    print(f"DEBUG: Incoming request: {method} {path}")
+    try:
+        response = await call_next(request)
+        process_time = (time.time() - start_time) * 1000
+        print(f"DEBUG: Completed request: {method} {path} - Status: {response.status_code} - {process_time:.2f}ms")
+        return response
+    except Exception as e:
+        print(f"DEBUG: Request FAILED: {method} {path} - Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise e
+
+# Add CORS Middleware
+from fastapi.middleware.cors import CORSMiddleware
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        frontend_url
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+router = APIRouter()
+
+# --- Professors ---
+@router.post("/professors", response_model=schemas.Professor)
+def create_professor(prof: schemas.ProfessorCreate, db: Session = Depends(database.get_db)):
+    db_prof = models.Professor(**prof.dict())
+    db.add(db_prof)
+    db.commit()
+    db.refresh(db_prof)
+    return db_prof
+
+@router.get("/professors", response_model=List[schemas.ProfessorWithDetails])
+def read_professors(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
+    return db.query(models.Professor).offset(skip).limit(limit).all()
+
+@router.delete("/professors/{professor_id}")
+def delete_professor(professor_id: UUID, db: Session = Depends(database.get_db)):
+    db_prof = db.query(models.Professor).filter(models.Professor.id == professor_id).first()
+    if not db_prof:
+        raise HTTPException(status_code=404, detail="Professor not found")
+    db.delete(db_prof)
+    db.commit()
+    return {"status": "success"}
+
+# --- Locations ---
+@router.post("/locations", response_model=schemas.Location)
+def create_location(loc: schemas.LocationCreate, db: Session = Depends(database.get_db)):
+    db_loc = models.Location(**loc.dict())
+    db.add(db_loc)
+    db.commit()
+    db.refresh(db_loc)
+    return db_loc
+
+@router.get("/locations", response_model=List[schemas.Location])
+def read_locations(db: Session = Depends(database.get_db)):
+    return db.query(models.Location).all()
+
+@router.delete("/locations/{location_id}")
+def delete_location(location_id: UUID, db: Session = Depends(database.get_db)):
+    db_loc = db.query(models.Location).filter(models.Location.id == location_id).first()
+    if not db_loc:
+        raise HTTPException(status_code=404, detail="Location not found")
+    db.delete(db_loc)
+    db.commit()
+    return {"status": "success"}
+
+# --- Constraints ---
+@router.post("/constraints", response_model=schemas.Constraint)
+def create_constraint(constraint: schemas.ConstraintCreate, db: Session = Depends(database.get_db)):
+    if constraint.type in (models.ConstraintType.DAY_UNAVAILABLE, models.ConstraintType.DAY_PREFERRED):
+        day_of_week = constraint.value.get("dayOfWeek")
+        if day_of_week:
+            conflict_type = models.ConstraintType.DAY_PREFERRED if constraint.type == models.ConstraintType.DAY_UNAVAILABLE else models.ConstraintType.DAY_UNAVAILABLE
+            existing = db.query(models.Constraint).filter(
+                models.Constraint.professor_id == constraint.professor_id,
+                models.Constraint.type == conflict_type
+            ).all()
+            for ec in existing:
+                if ec.value.get("dayOfWeek") == day_of_week:
+                    raise HTTPException(status_code=400, detail="Conflicting constraint already exists for this professor and day.")
+
+    db_constraint = models.Constraint(**constraint.dict())
+    db.add(db_constraint)
+    db.commit()
+    db.refresh(db_constraint)
+    return db_constraint
+
+@router.get("/constraints", response_model=List[schemas.Constraint])
+def read_constraints(db: Session = Depends(database.get_db)):
+    return db.query(models.Constraint).all()
+
+@router.delete("/constraints/{constraint_id}")
+def delete_constraint(constraint_id: UUID, db: Session = Depends(database.get_db)):
+    db_constraint = db.query(models.Constraint).filter(models.Constraint.id == constraint_id).first()
+    if not db_constraint:
+        raise HTTPException(status_code=404, detail="Constraint not found")
+    db.delete(db_constraint)
+    db.commit()
+    return {"status": "success"}
+
+# --- Settings ---
+@router.post("/settings", response_model=schemas.DutySetting)
+def create_setting(setting: schemas.DutySettingCreate, db: Session = Depends(database.get_db)):
+    try:
+        db_setting = models.DutySetting(**setting.dict())
+        db.add(db_setting)
+        db.commit()
+        db.refresh(db_setting)
+        return db_setting
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating setting: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error while creating setting")
+
+@router.get("/settings", response_model=List[schemas.DutySetting])
+def read_settings(db: Session = Depends(database.get_db)):
+    return db.query(models.DutySetting).all()
+
+# --- Schedule Assignments ---
+@router.get("/roster", response_model=List[schemas.RosterAssignment])
+def get_roster(db: Session = Depends(database.get_db)):
+    return db.query(models.RosterAssignment).order_by(models.RosterAssignment.date.asc()).all()
+
+@router.get("/roster/diagnostics")
+def get_diagnostics(setting_id: UUID, db: Session = Depends(database.get_db)):
+    try:
+        return solver.check_feasibility(db, setting_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/test-solver")
+def test_solver(db: Session = Depends(database.get_db)):
+    """Diagnostic endpoint to verify OR-Tools works in this environment"""
+    try:
+        print("DEBUG: Starting test-solver")
+        # Create a dummy setting
+        from datetime import date
+        from .models import DutySetting, Professor, Location
+        import uuid
+        
+        # Clean up existing test data if any
+        db.query(models.RosterAssignment).delete()
+        db.query(models.DutySetting).delete()
+        db.query(models.Constraint).delete()
+        db.query(models.Professor).delete()
+        db.query(models.Location).delete()
+        db.commit()
+
+        # Add 3 profs
+        profs = [Professor(name=f"P{i}", code=f"C{i}") for i in range(3)]
+        db.add_all(profs)
+        # Add 1 loc
+        loc = Location(name="L1")
+        db.add(loc)
+        # Add setting for 3 days
+        sett = DutySetting(start_date=date(2026,3,1), end_date=date(2026,3,3), count_sundays=1)
+        db.add(sett)
+        db.commit()
+        db.refresh(sett)
+        
+        print(f"DEBUG: Created test data, setting_id={sett.id}")
+        
+        # Run solver
+        result = solver.generate_schedule(db, sett.id)
+        print(f"DEBUG: Solver result: {result}")
+        return {"status": "success", "result": result}
+    except Exception as e:
+        print(f"DEBUG: test-solver FAILED: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+@router.get("/db-status")
+def db_status(db: Session = Depends(database.get_db)):
+    """Check how many items are in each table"""
+    try:
+        return {
+            "professors": db.query(models.Professor).count(),
+            "locations": db.query(models.Location).count(),
+            "constraints": db.query(models.Constraint).count(),
+            "settings": db.query(models.DutySetting).count(),
+            "assignments": db.query(models.RosterAssignment).count(),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.post("/generate-roster")
+def build_roster(setting_id: UUID, db: Session = Depends(database.get_db)):
+    print(f"DEBUG: build_roster called with setting_id={setting_id}")
+    try:
+        print("DEBUG: Calling solver.generate_schedule...")
+        result = solver.generate_schedule(db, setting_id)
+        print(f"DEBUG: solver.generate_schedule returned: {result}")
+        return result
+    except solver.SchedulingError as e:
+        print(f"DEBUG: SchedulingError: {str(e)}")
+        import json
+        try:
+            err_data = json.loads(str(e))
+            raise HTTPException(status_code=400, detail=err_data)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"DEBUG: Unexpected error in build_roster: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal scheduling error: {str(e)}")
+
+@router.get("/export/csv")
+def export_csv(db: Session = Depends(database.get_db)):
+    print("DEBUG: export_csv called")
+    try:
+        assignments = db.query(models.RosterAssignment).order_by(models.RosterAssignment.date.asc()).all()
+        locations = db.query(models.Location).all()
+        professors = db.query(models.Professor).all()
+        prof_map = {p.id: p.name for p in professors}
+        
+        print(f"DEBUG: Found {len(assignments)} assignments, {len(locations)} locations, {len(professors)} professors")
+        
+        grouped = {}
+        for a in assignments:
+            if a.date not in grouped:
+                grouped[a.date] = {}
+            grouped[a.date][a.location_id] = prof_map.get(a.professor_id, "Unknown")
+            
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        headers = ["Date"] + [loc.name for loc in locations]
+        
+        current_week = None
+        import math
+        
+        for d in sorted(grouped.keys()):
+            week_num = math.ceil(d.day / 7)
+            if current_week != week_num:
+                if current_week is not None:
+                    writer.writerow([]) # Empty row space
+                writer.writerow([f"Week {week_num}"])
+                writer.writerow(headers)
+                current_week = week_num
+                
+            row = [str(d)]
+            for loc in locations:
+                row.append(grouped[d].get(loc.id, "-"))
+            writer.writerow(row)
+            
+        output.seek(0)
+        print("DEBUG: CSV generation successful")
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=roster.csv"}
+        )
+    except Exception as e:
+        print(f"DEBUG: export_csv FAILED: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/export/pdf")
+def export_pdf(db: Session = Depends(database.get_db)):
+    print("DEBUG: export_pdf called")
+    try:
+        from reportlab.platypus import Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        
+        assignments = db.query(models.RosterAssignment).order_by(models.RosterAssignment.date.asc()).all()
+        locations = db.query(models.Location).all()
+        professors = db.query(models.Professor).all()
+        prof_map = {p.id: p.name for p in professors}
+        
+        print(f"DEBUG: Found {len(assignments)} assignments, {len(locations)} locations, {len(professors)} professors")
+
+        grouped = {}
+        for a in assignments:
+            if a.date not in grouped:
+                grouped[a.date] = {}
+            grouped[a.date][a.location_id] = prof_map.get(a.professor_id, "Unknown")
+            
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        import math
+        current_week = None
+        current_table_data = []
+        
+        headers = ["Date"] + [loc.name for loc in locations]
+        
+        def flush_table():
+            if len(current_table_data) > 1:
+                table = Table(current_table_data)
+                style = TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#6366f1')),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('BOTTOMPADDING', (0,0), (-1,0), 12),
+                    ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f8fafc')),
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+                ])
+                table.setStyle(style)
+                elements.append(table)
+                elements.append(Spacer(1, 20))
+                current_table_data.clear()
+
+        for d in sorted(grouped.keys()):
+            week_num = math.ceil(d.day / 7)
+            if current_week != week_num:
+                flush_table()
+                elements.append(Paragraph(f"<b>Week {week_num}</b>", styles['Heading2']))
+                current_table_data.append(headers)
+                current_week = week_num
+                
+            row = [str(d)]
+            for loc in locations:
+                row.append(grouped[d].get(loc.id, "-"))
+            current_table_data.append(row)
+            
+        flush_table()
+        
+        print("DEBUG: Building PDF elements...")
+        doc.build(elements)
+        buffer.seek(0)
+        
+        print("DEBUG: PDF generation successful")
+        return StreamingResponse(
+            buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=roster.pdf"}
+        )
+    except Exception as e:
+        print(f"DEBUG: export_pdf FAILED: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Reset ---
+@router.delete("/reset")
+def reset_scheduler(db: Session = Depends(database.get_db)):
+    db.query(models.RosterAssignment).delete()
+    db.query(models.Constraint).delete()
+    db.query(models.Location).delete()
+    db.query(models.Professor).delete()
+    db.query(models.DutySetting).delete()
+    db.commit()
+    return {"message": "Scheduler reset successfully"}
+
+app.include_router(router, prefix="/api")
+
+@app.get("/")
+def read_root():
+    return {"message": "Faculty Duty Scheduler Engine Online"}

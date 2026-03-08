@@ -6,7 +6,7 @@ import { CalendarRange, Sparkles, RefreshCcw, Printer, ArrowRight, Download, Ale
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function RosterPage() {
     const [loading, setLoading] = useState(false);
