@@ -119,11 +119,16 @@ def delete_constraint(constraint_id: str, db: Session = Depends(database.get_db)
 # --- Settings ---
 @router.post("/settings", response_model=schemas.DutySetting)
 def create_setting(setting: schemas.DutySettingCreate, db: Session = Depends(database.get_db)):
-    db_setting = models.DutySetting(**setting.model_dump())
-    db.add(db_setting)
-    db.commit()
-    db.refresh(db_setting)
-    return db_setting
+    try:
+        db_setting = models.DutySetting(**setting.model_dump())
+        db.add(db_setting)
+        db.commit()
+        db.refresh(db_setting)
+        return db_setting
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating setting: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error while creating setting")
 
 @router.get("/settings", response_model=List[schemas.DutySetting])
 def read_settings(db: Session = Depends(database.get_db)):

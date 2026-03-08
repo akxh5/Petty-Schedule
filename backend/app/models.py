@@ -1,14 +1,11 @@
 import uuid
 import datetime
 import enum
-from sqlalchemy import Column, String, Date, Integer, ForeignKey, Enum, JSON, UniqueConstraint
+from sqlalchemy import Column, String, Date, Integer, ForeignKey, Enum, JSON, UniqueConstraint, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from .database import Base
-
-def generate_uuid():
-    return str(uuid.uuid4())
 
 class ConstraintType(str, enum.Enum):
     DAY_UNAVAILABLE = "DAY_UNAVAILABLE"
@@ -19,7 +16,7 @@ class ConstraintType(str, enum.Enum):
 class Professor(Base):
     __tablename__ = "professors"
 
-    id = Column(String, primary_key=True, default=generate_uuid)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     code = Column(String, nullable=False, unique=True)
     created_at = Column(Date, default=datetime.date.today)
@@ -30,7 +27,7 @@ class Professor(Base):
 class Location(Base):
     __tablename__ = "locations"
 
-    id = Column(String, primary_key=True, default=generate_uuid)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False, unique=True)
     created_at = Column(Date, default=datetime.date.today)
 
@@ -39,17 +36,17 @@ class Location(Base):
 class DutySetting(Base):
     __tablename__ = "duty_settings"
 
-    id = Column(String, primary_key=True, default=generate_uuid)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     count_sundays = Column(Integer, default=1) # Boolean equivalent for sqlite/postgres compatibility
-    created_at = Column(Date, default=datetime.date.today)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Constraint(Base):
     __tablename__ = "constraints"
 
-    id = Column(String, primary_key=True, default=generate_uuid)
-    professor_id = Column(String, ForeignKey("professors.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    professor_id = Column(UUID(as_uuid=True), ForeignKey("professors.id"), nullable=False)
     type = Column(Enum(ConstraintType), nullable=False)
     value = Column(JSON, nullable=False)
 
@@ -58,9 +55,9 @@ class Constraint(Base):
 class RosterAssignment(Base):
     __tablename__ = "roster_assignments"
 
-    id = Column(String, primary_key=True, default=generate_uuid)
-    professor_id = Column(String, ForeignKey("professors.id"), nullable=False)
-    location_id = Column(String, ForeignKey("locations.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    professor_id = Column(UUID(as_uuid=True), ForeignKey("professors.id"), nullable=False)
+    location_id = Column(UUID(as_uuid=True), ForeignKey("locations.id"), nullable=False)
     date = Column(Date, nullable=False)
 
     professor = relationship("Professor", back_populates="assignments")
